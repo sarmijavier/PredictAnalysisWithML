@@ -30,10 +30,13 @@
                         <span class="grey--text"> 
                           {{image.name}}
                         </span>
-                        <v-chip>
-                          {{image.scorePromedio}}
+                        <v-chip :color="selectClass(image.scorePromedio | trimScore)">
+                          {{image.scorePromedio | trimScore}}
                         </v-chip>
                         <br>
+                        <span>
+                          {{image.labels | separateLabels}}
+                        </span>
                       </div>
                     </v-card-title>
                     <v-card-actions>
@@ -56,11 +59,10 @@
 import { firestore } from '@/main'
 import { storage } from '@/main'
 import axios from 'axios'
-
 export default {
 
   data: () => ({
-    apiKey:'AIzaSyCzSv5d8IMPzxLQkk1ib-bOdcZKPtVxvws',
+    apiKey:'AIzaSyDQJqEEOuSzHFrbrxO75wIMDAOt6yiG96Q',
     file: '',
     images: []
   }),
@@ -82,9 +84,9 @@ export default {
             "features": [{
               "type": "LABEL_DETECTION"
             }],
-            "Image": {
+            "image": {
               "source": {
-                "imageUrl":url
+                "imageUri":url
               }
             }
           }]
@@ -111,15 +113,28 @@ export default {
     },
     goToImageDetail: function(id) {
       this.$router.push({path: `/image/${id}` })
+    },
+    selectClass: function(score) {
+    if(score < -0.25){
+        return 'red'
+    }else if(score >= -0.25 && score < 0.25){
+        return 'orange'
+    }else {
+        return 'green'
     }
+}
 
   },
   firestore() {
     return {
       images: firestore.collection('images')
     }
+  },
+  filters: {
+    separateLabels: function(value) {
+      return `${value[0]},${value[1]},${value[2]}`
+    }
   }
-
 }
 
 </script>

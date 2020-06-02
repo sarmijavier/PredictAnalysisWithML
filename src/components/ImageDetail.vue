@@ -12,10 +12,13 @@
                         <span class="grey--text"> 
                           {{image.name}}
                         </span>
-                        <v-chip>
-                          {{image.scorePromedio}}
+                        <v-chip :color="selectClass(image.scorePromedio | trimScore)">
+                          {{image.scorePromedio | trimScore}}
                         </v-chip>
                         <br>
+                        <span>
+                            {{image.labels | separateLabels }}
+                        </span>
                       </div>
                     </v-card-title>
                 </v-card>
@@ -57,9 +60,12 @@
 
 import {firestore} from '@/main'
 //import {storage } from '@/main'
+import axios from 'axios' //llamada http a una API rest 
+
 export default {
     data () {
         return {
+            apiKey:'AIzaSyDQJqEEOuSzHFrbrxO75wIMDAOt6yiG96Q',
             id: this.$route.params.id,
             image: '',
             comentario: '',
@@ -68,13 +74,45 @@ export default {
     },
     methods: {
         enviarComentario: function(){
-                let comentario = {
-                imageId: this.id,
-                texto: this.comentario,
-                createdAt: (+new Date()),
-                score: 0
+            const data = {
+                "document": {
+                    "type": "PLAIN_TEXT",
+                    "language":"ES",
+                    "content": this.comentario
+                },
+                "encodingType": "UTF8"
             }
-            firestore.collection('comentarios').add(comentario)
+            axios.post(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${this.apiKey}`,data)
+            .then(response => {
+                const score = response.data.documentSentiment.score
+                let comentario = {
+                    imageId: this.id,
+                    texto: this.comentario,
+                    createdAt: (+new Date()),
+                    score: score
+                }
+                firestore.collection('comentarios').add(comentario).then(() => {
+                    const length = this.comentarios.length
+                    let scorePromedio = 0
+                    this.comentarios.forEach(function(comentario) {
+                        scorePromedio = scorePromedio + comentario.score
+                    })
+                    scorePromedio = scorePromedio / length
+                    firestore.collection("images").doc(this.id).set({
+                        scorePromedio : scorePromedio
+                    },{merge: true})
+                    this.comentario = ''
+                })
+            })
+        },
+                selectClass: function(score) {
+            if(score < -0.25){
+                return 'red'
+            }else if(score >= -0.25 && score < 0.25){
+                return 'warning'
+            }else {
+                return 'success'
+            }
         }
     },
     firestore() {
@@ -82,6 +120,14 @@ export default {
             image: firestore.collection('images').doc(this.id),
             comentarios: firestore.collection('comentarios').where("imageId", "==",this.id)
         }
-    } 
+    },
+    filters: {
+        separateLabels: function(value) {
+        return `${value[0]},${value[1]},${value[2]}`
+        },
+        trimScore: function (value) {
+            return Number(value.toString().slice(0,5))
+        }
+    }
 }
 </script>
